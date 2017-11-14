@@ -36,9 +36,11 @@ import org.apache.commons.cli.ParseException;
 import org.apache.tinkerpop.gremlin.jsr223.JavaTranslator;
 import org.apache.tinkerpop.gremlin.process.traversal.Bytecode;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
+import org.apache.tinkerpop.gremlin.spark.process.computer.SparkGraphComputer;
 import org.apache.tinkerpop.gremlin.structure.Graph;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
 import org.apache.tinkerpop.gremlin.structure.io.IoCore;
+import org.apache.tinkerpop.gremlin.structure.util.GraphFactory;
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerFactory;
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph;
 
@@ -51,8 +53,9 @@ class ConsoleCompiler {
         final Options options = new Options();
         options.addOption("f", "file", true, "a file that contains a SPARQL query");
         options.addOption("g", "graph", true, "the graph that's used to execute the query [classic|modern|crew|kryo file]");
+        options.addOption("s","cfile",true,"the file that's used to get configuration for Spark.");
         // TODO: add an OLAP option (perhaps: "--olap spark"?)
-
+        boolean flag = false;
         final CommandLineParser parser = new DefaultParser();
         final CommandLine commandLine;
 
@@ -94,6 +97,12 @@ class ConsoleCompiler {
                 case "crew":
                     graph = TinkerFactory.createTheCrew();
                     break;
+                case "spark":
+                	graph = GraphFactory.open(commandLine.getOptionValue("cfile"));
+                	flag = true;
+                	System.out.println("the conf. file :"+commandLine.getOptionValue("cfile"));
+                	//graph.traversal().withComputer(SparkGraphComputer.class);
+                	break;
                 default:
                     graph = TinkerGraph.open();
                     System.out.println("Graph Created");
@@ -127,7 +136,10 @@ class ConsoleCompiler {
 //        JavaTranslator.of(graph.traversal()).translate(traversalByteCode);
 //        
 //        System.out.println("the Byte Code : "+ traversalByteCode.toString());
-        printWithHeadline("Result", String.join(System.lineSeparator(),JavaTranslator.of(graph.traversal()).translate(traversalByteCode).toStream().map(Object::toString).collect(Collectors.toList())));
+        if(flag)
+            printWithHeadline("Result", String.join(System.lineSeparator(),JavaTranslator.of(graph.traversal().withComputer(SparkGraphComputer.class)).translate(traversalByteCode).toStream().map(Object::toString).collect(Collectors.toList())));
+        else
+        	printWithHeadline("Result", String.join(System.lineSeparator(),JavaTranslator.of(graph.traversal()).translate(traversalByteCode).toStream().map(Object::toString).collect(Collectors.toList())));
         printWithHeadline("Traversal (after execution)", traversal);
     }
 
